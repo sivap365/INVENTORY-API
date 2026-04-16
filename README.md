@@ -228,26 +228,3 @@ inventory-api/
     ├── products.py       # POST /products, GET /products/{sku}
     └── orders.py         # POST /orders, GET /orders/{id}
 ```
-
----
-
-## Testing Concurrency (Interview Demo)
-
-To simulate two users buying the last item simultaneously, send two requests at the same time:
-
-```powershell
-# Run both in parallel
-Start-Job { Invoke-RestMethod -Uri "http://127.0.0.1:8000/orders" -Method POST -ContentType "application/json" -Body '{"idempotency_key":"u1","items":[{"sku":"SKU-1","quantity":1}]}' }
-Start-Job { Invoke-RestMethod -Uri "http://127.0.0.1:8000/orders" -Method POST -ContentType "application/json" -Body '{"idempotency_key":"u2","items":[{"sku":"SKU-1","quantity":1}]}' }
-```
-
-**Expected result:** One succeeds (200), one fails (400 insufficient stock). Stock remains correct.
-
----
-
-## Key Design Decisions
-
-- **`SELECT FOR UPDATE`** — Locks product rows during stock check + deduction so concurrent requests can't read stale stock
-- **`idempotency_key` UNIQUE constraint** — Prevents the same request from creating two orders, even if sent twice
-- **Single `db.commit()`** — Ensures stock deduction and order creation are atomic (all-or-nothing)
-- **DB-level CHECK constraint** — Acts as a last line of defense even if application logic has a bug
